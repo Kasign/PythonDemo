@@ -46,23 +46,23 @@ class SQLiteWraper(object):
     """
     数据库的一个小封装，更好的处理多线程写入
     """
-    def __init__(self,path,command='',*args,**kwargs):
+    def __init__(self, path, command='',*args,**kwargs):
         self.lock = threading.RLock() #锁
         self.path = path #数据库连接参数
 
         if command != '':
-            conn=self.get_conn()
-            cu=conn.cursor()
+            conn = self.get_conn()
+            cu = conn.cursor()
             cu.execute(command)
 
     # 获取连接
     def get_conn(self):
         conn = sqlite3.connect(self.path)#,check_same_thread=False)
-        conn.text_factory=str
+        conn.text_factory = str
         return conn
 
     # 关闭连接
-    def conn_close(self,conn=None):
+    def conn_close(self, conn=None):
         conn.close()
 
     # 关闭连接，并释放
@@ -79,7 +79,7 @@ class SQLiteWraper(object):
 
     #执行指令
     @conn_trans
-    def execute(self,command,method_flag=0,conn=None):
+    def execute(self, command, method_flag=0, conn=None):
         cu = conn.cursor()
 
         if not method_flag:
@@ -90,11 +90,11 @@ class SQLiteWraper(object):
 
     # 获取所有数据
     @conn_trans
-    def fetchall(self,command="select name from xiaoqu",conn=None):
-        cu=conn.cursor()
-        lists=[]
+    def fetchall(self, command = "select quarters_name from xiaoqu", conn=None):
+        cu = conn.cursor()
+        lists = []
         cu.execute(command)
-        lists=cu.fetchall()
+        lists = cu.fetchall()
         return lists
 
 
@@ -110,7 +110,7 @@ def gen_xiaoqu_insert_command(info_dict):
         else:
             t.append(u'')
     t=tuple(t)
-    command = (r"insert into xiaoqu values(NULL,?,?,?,?,?,?,?)",t)
+    command = (r"insert into xiaoqu values(NULL,?,?,?,?,?,?,?)", t)
     print('小区信息插入命令',command)
     return command
 
@@ -130,8 +130,8 @@ def gen_chengjiao_insert_command(info_dict):
             t.append('')
     t = tuple(t)
     print(len(t))
-    command = (r"insert into chengjiao values(NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",t)
-    print('成交记录插入命令',command)
+    command = (r"insert into chengjiao values(NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", t)
+    print('成交记录插入命令', command)
     return command
 
 
@@ -175,13 +175,13 @@ def xiaoqu_spider(db_xq,url_page=u"http://bj.lianjia.com/xiaoqu/pg1rs%E6%98%8C%E
         xq_position_S = xq_position_p.find('a',{'class':'bizcircle'}).get('title')
 
 
-        xq_positionInfo = xq_position_p.text.replace(' ','').replace('\xa0','').replace('\n','')
+        xq_positionInfo = xq_position_p.text.replace(' ', '').replace('\xa0', '').replace('\n', '')
         xq_positionInfoArr = xq_positionInfo.split('/')
         arrCount = len(xq_positionInfoArr)
         # print(xq_positionInfoArr)
 
         xq_type = '' #户型
-        for i in range(1,arrCount-1):
+        for i in range(1, arrCount-1):
             if xq_type:
                 xq_type = xq_type + ',' + xq_positionInfoArr[i]
             else:
@@ -194,11 +194,12 @@ def xiaoqu_spider(db_xq,url_page=u"http://bj.lianjia.com/xiaoqu/pg1rs%E6%98%8C%E
         if xq_taglistFirst != '':
             xq_taglist = xq_taglistFirst
 
-        xq_price_p = xq.find('div',{'class':'totalPrice'})
+        xq_price_p = xq.find('div',{'class': 'totalPrice'})
 
-        xq_price = ''
-        for price in xq_price_p.text:
-            xq_price = xq_price + price
+
+        xq_price = xq_price_p.span.text
+        # for price in xq_price_p.text:
+        #     xq_price = xq_price + price
 
         # print('price',xq_price)
         # print(xq_type)
@@ -206,13 +207,13 @@ def xiaoqu_spider(db_xq,url_page=u"http://bj.lianjia.com/xiaoqu/pg1rs%E6%98%8C%E
         # print('小',xq_position_S)
 
 
-        info_dict={}
+        info_dict = {}
         info_dict.update({u'小区名称': space_string(xq_title)})
         info_dict.update({u'大区域': space_string(xq_position_B)})
         info_dict.update({u'小区域': space_string(xq_position_S)})
         info_dict.update({u'小区户型': space_string(xq_type)})
         info_dict.update({u'建造时间': space_string(xq_positionInfoArr[arrCount - 1])})
-        info_dict.update({u'价格': space_string(xq_price)})
+        info_dict.update({u'价格': space_int(xq_price)})
         info_dict.update({u'优势': space_string(xq_taglist)})
         command = gen_xiaoqu_insert_command(info_dict)
         db_xq.execute(command, 1)
@@ -225,6 +226,15 @@ def space_string(string):
     else:
         return string
 
+def space_int(string):
+
+    if string == '暂无':
+        return 0
+
+    if string.isspace() == '':
+        return 0
+    else:
+        return eval(string)
 
 def do_xiaoqu_spider(db_xq,region = u"昌平"):
     """
@@ -234,8 +244,8 @@ def do_xiaoqu_spider(db_xq,region = u"昌平"):
     print('小区信息获取')
     print(url)
 
-    req = requests.get(url, headers=hds[random.randint(0,len(hds)-1)])
-    plain_text=req.content.decode()
+    req = requests.get(url, headers = hds[random.randint(0,len(hds)-1)])
+    plain_text = req.content.decode()
     soup = BeautifulSoup(plain_text, 'html.parser')
     d= soup.find('div',{'class': 'page-box house-lst-page-box'}).get('page-data')
     d = eval(d)
@@ -321,12 +331,14 @@ def chengjiao_spider(db_cj, url_page = u"http://bj.lianjia.com/chengjiao/pg1rs%E
         house_price = house_infor.find('div',{'class': 'price'})
         if house_price.find('span'):
             # print(house_price.span.text)
-            info_dict.update({u'房产总价': house_price.span.i.text})
-            info_dict.update({u'房产单价': house_price.b.text})
+            info_dict.update({u'房产总价': eval(house_price.span.i.text)})
+            info_dict.update({u'房产单价': eval(house_price.b.text)})
         else:
             # print(house_price.text)
-            info_dict.update({u'房产总价': house_price.text})
-            info_dict.update({u'房产单价': house_price.text})
+            # info_dict.update({u'房产总价': house_price.text})
+            # info_dict.update({u'房产单价': house_price.text})
+            info_dict.update({u'房产总价': 0})
+            info_dict.update({u'房产单价': 0})
 
         house_msg = house_infor.find('div', {'class': 'msg'})
         if house_msg:
@@ -398,10 +410,14 @@ def do_xiaoqu_chengjiao_spider(db_xq, db_cj):
     """
     count = 0
     xq_list = db_xq.fetchall()
+
+    print(xq_list)
+
     for xq in xq_list:
+        print(xq)
         xiaoqu_chengjiao_spider(db_cj, xq[0])
-        count+= 1
-        print ('have spidered %d xiaoqu' % count)
+        count += 1
+        print('have spidered %d xiaoqu' % count)
     print ('done')
 
 
@@ -436,19 +452,19 @@ def exception_spider(db_cj):
     """
     重新爬取爬取异常的链接
     """
-    count=0
+    count = 0
     excep_list = exception_read()
     while excep_list:
         for excep in excep_list:
             excep = excep.strip()
             if excep == "":
                 continue
-            excep_name,url = excep.split(" ",1)
+            excep_name,url = excep.split(" ", 1)
             if excep_name == "chengjiao_spider":
-                chengjiao_spider(db_cj,url)
+                chengjiao_spider(db_cj, url)
                 count += 1
             elif excep_name == "xiaoqu_chengjiao_spider":
-                xiaoqu_chengjiao_spider(db_cj,url)
+                xiaoqu_chengjiao_spider(db_cj, url)
                 count += 1
             else:
                 print ("wrong format")
@@ -460,24 +476,24 @@ def exception_spider(db_cj):
 
 if __name__ == "__main__":
 
-    command = "create table if not exists xiaoqu (id integer PRIMARY KEY AUTOINCREMENT,name TEXT , regionb TEXT, regions TEXT, style TEXT, year TEXT,price TEXT,advantage TEXT)"
+    command = "create table if not exists xiaoqu (id integer PRIMARY KEY AUTOINCREMENT, quarters_name TEXT , quarters_big TEXT, quarters_small TEXT, quarters_structure TEXT, creat_year TEXT, quarters_price INTEGER , quarters_advantage TEXT)"
     db_xq = SQLiteWraper('lianjia-xq.db', command)
-    info_list = [u'小区名称',u'大区域',u'小区域',u'小区户型',u'建造时间',u'价格',u'优势']
-    info_list = tuple(info_list)
-    command = (r"insert into xiaoqu values(NULL,?,?,?,?,?,?,?)", info_list)
-    db_xq.execute(command, 1)
+    # info_list = [u'小区名称',u'大区域',u'小区域',u'小区户型',u'建造时间',u'价格',u'优势']
+    # info_list = tuple(info_list)
+    # command = (r"insert into xiaoqu values(NULL,?,?,?,?,?,?,?)", info_list)
+    # db_xq.execute(command, 1)
 
-    command = "create table if not exists chengjiao (id integer PRIMARY KEY AUTOINCREMENT, name TEXT,a TEXT, b TEXT, c TEXT, d TEXT, e TEXT, f TEXT, g TEXT, h TEXT, i TEXT,j TEXT, k TEXT, l TEXT, m TEXT, n TEXT, o TEXT, p TEXT,q TEXT, r TEXT, s TEXT, t TEXT, u TEXT, v TEXT, w TEXT,x TEXT, y TEXT, z TEXT, a1 TEXT, a2 TEXT)"
+    command = "create table if not exists chengjiao (id integer PRIMARY KEY AUTOINCREMENT, name TEXT, quarters_pref TEXT, sign_data TEXT, sign_company TEXT, house_style TEXT, house_area_q TEXT, total_price INTEGER, pure_price INTEGER, list_price TEXT, house_style_d TEXT,floor TEXT, house_area TEXT, house_type_d TEXT, real_area TEXT, building_type TEXT, house_direction TEXT, creat_year TEXT,fitment TEXT, building_structure TEXT, heating_type TEXT, lift_scale TEXT,  property_right_year TEXT, has_lift TEXT, house_num TEXT, deal_type TEXT, list_time TEXT, house_used TEXT, age_limit TEXT, house_belong TEXT)"
     db_cj = SQLiteWraper('lianjia-cj.db', command)
 
-    info_list=[u'小区名称',u'链接', u'签约日期', u'签约公司', u'户型', u'面积', u'房产总价', u'房产单价', u'挂牌价格', u'房屋户型', u'所在楼层', u'建筑面积', u'户型结构', u'套内面积', u'建筑类型', u'房屋朝向', u'建成年代', u'装修情况', u'建筑结构', u'供暖方式', u'梯户比例', u'产权年限', u'配备电梯', '链家编号', u'交易权属', u'挂牌时间', u'房屋用途', u'房屋年限', u'房权所属']
-    info_list = tuple(info_list)
-    command = (r"insert into chengjiao values(NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", info_list)
-    db_cj.execute(command, 1)
+    # info_list=[u'小区名称',u'链接', u'签约日期', u'签约公司', u'户型', u'面积', u'房产总价', u'房产单价', u'挂牌价格', u'房屋户型', u'所在楼层', u'建筑面积', u'户型结构', u'套内面积', u'建筑类型', u'房屋朝向', u'建成年代', u'装修情况', u'建筑结构', u'供暖方式', u'梯户比例', u'产权年限', u'配备电梯', '链家编号', u'交易权属', u'挂牌时间', u'房屋用途', u'房屋年限', u'房权所属']
+    # info_list = tuple(info_list)
+    # command = (r"insert into chengjiao values(NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", info_list)
+    # db_cj.execute(command, 1)
 
     #爬下所有的小区信息
-    for region in regions:
-        do_xiaoqu_spider(db_xq,region)
+    # for region in regions:
+    #     do_xiaoqu_spider(db_xq,region)
 
     #爬下所有小区里的成交信息
     do_xiaoqu_chengjiao_spider(db_xq, db_cj)
